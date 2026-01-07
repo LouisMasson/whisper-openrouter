@@ -59,27 +59,43 @@ final class TextInjector {
     }
 
     private func pasteViaCGEvent() {
-        // Utiliser AppleScript pour la fiabilité
-        pasteViaAppleScript()
-    }
+        print("📋 TextInjector: Utilisation de CGEvent pour Cmd+V")
 
-    private func pasteViaAppleScript() {
-        let script = """
-        tell application "System Events"
-            keystroke "v" using command down
-        end tell
-        """
+        // Créer événement Cmd+V via CGEvent (nécessite seulement Accessibility, pas Automation)
+        let vKeyCode: CGKeyCode = 9  // Touche V
 
-        var error: NSDictionary?
-        if let appleScript = NSAppleScript(source: script) {
-            appleScript.executeAndReturnError(&error)
+        // Événement: Appui sur Cmd
+        guard let cmdDown = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Command), keyDown: true) else {
+            print("❌ TextInjector: Impossible de créer événement Cmd down")
+            return
         }
 
-        if let error = error {
-            print("❌ TextInjector: Erreur AppleScript: \(error)")
-        } else {
-            print("✅ TextInjector: Cmd+V exécuté via AppleScript")
+        // Événement: Appui sur V avec Cmd
+        guard let vDown = CGEvent(keyboardEventSource: nil, virtualKey: vKeyCode, keyDown: true) else {
+            print("❌ TextInjector: Impossible de créer événement V down")
+            return
         }
+        vDown.flags = .maskCommand
+
+        // Événement: Relâchement de V
+        guard let vUp = CGEvent(keyboardEventSource: nil, virtualKey: vKeyCode, keyDown: false) else {
+            print("❌ TextInjector: Impossible de créer événement V up")
+            return
+        }
+        vUp.flags = .maskCommand
+
+        // Événement: Relâchement de Cmd
+        guard let cmdUp = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Command), keyDown: false) else {
+            print("❌ TextInjector: Impossible de créer événement Cmd up")
+            return
+        }
+
+        // Poster les événements
+        let loc = CGEventTapLocation.cghidEventTap
+        vDown.post(tap: loc)
+        vUp.post(tap: loc)
+
+        print("✅ TextInjector: Cmd+V envoyé via CGEvent")
     }
 
 
@@ -93,5 +109,29 @@ final class TextInjector {
     static func requestAccessibilityPermission() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
         _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
+    }
+
+    /// Force la demande de permission Automation en exécutant un AppleScript simple
+    static func requestAutomationPermission() {
+        print("🔐 TextInjector: Demande de permission Automation...")
+
+        let script = """
+        tell application "System Events"
+            return "Permission granted"
+        end tell
+        """
+
+        var error: NSDictionary?
+        if let appleScript = NSAppleScript(source: script) {
+            let result = appleScript.executeAndReturnError(&error)
+
+            if let error = error {
+                print("⚠️ TextInjector: Permission Automation non accordée")
+                print("   Code erreur: \(error["NSAppleScriptErrorNumber"] ?? "?")")
+                print("   Message: \(error["NSAppleScriptErrorBriefMessage"] ?? "?")")
+            } else {
+                print("✅ TextInjector: Permission Automation OK - \(result.stringValue ?? "OK")")
+            }
+        }
     }
 }

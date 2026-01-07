@@ -39,6 +39,10 @@ final class AppState: ObservableObject {
         if !TextInjector.hasAccessibilityPermission() {
             TextInjector.requestAccessibilityPermission()
         }
+
+        // Forcer la demande de permission Automation au démarrage
+        // Cela déclenchera une popup macOS si la permission n'est pas accordée
+        TextInjector.requestAutomationPermission()
     }
 
     private func startRecording() {

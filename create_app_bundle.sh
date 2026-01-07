@@ -26,17 +26,8 @@ mkdir -p "$RESOURCES_PATH"
 echo "3. Copie de l'exécutable..."
 cp .build/release/Whisper "$MACOS_PATH/Whisper"
 
-# Copier l'icône
-echo "4. Copie de l'icône..."
-if [ -f "AppIcon.icns" ]; then
-    cp AppIcon.icns "$RESOURCES_PATH/AppIcon.icns"
-    echo "   ✅ Icône copiée"
-else
-    echo "   ⚠️  AppIcon.icns introuvable, icône par défaut utilisée"
-fi
-
 # Créer Info.plist
-echo "5. Création de l'Info.plist..."
+echo "4. Création de l'Info.plist..."
 cat > "$CONTENTS_PATH/Info.plist" << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -44,8 +35,6 @@ cat > "$CONTENTS_PATH/Info.plist" << 'EOF'
 <dict>
     <key>CFBundleExecutable</key>
     <string>Whisper</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.hyrak.whisper</string>
     <key>CFBundleName</key>
@@ -63,13 +52,17 @@ cat > "$CONTENTS_PATH/Info.plist" << 'EOF'
     <key>NSMicrophoneUsageDescription</key>
     <string>Whisper a besoin d'accéder au microphone pour enregistrer votre voix et la transcrire en texte.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Whisper a besoin de contrôler System Events pour insérer automatiquement le texte transcrit.</string>
+    <string>Whisper a besoin de contrôler d'autres applications pour insérer automatiquement le texte transcrit.</string>
 </dict>
 </plist>
 EOF
 
 # Rendre l'exécutable... exécutable
 chmod +x "$MACOS_PATH/Whisper"
+
+# Signer l'application avec une signature ad-hoc
+echo "5. Signature de l'application..."
+codesign -s - -f --deep "$APP_PATH" 2>/dev/null || echo "⚠️  Signature ignorée"
 
 echo ""
 echo "✅ App Bundle créé avec succès!"
