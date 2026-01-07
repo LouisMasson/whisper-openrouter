@@ -6,6 +6,8 @@ Maintiens la touche **Fn** enfoncée, parle, relâche, et le texte apparaît là
 
 > **Note** : Ce projet est une reprise du projet original de [Paseru](https://github.com/Paseru/whisper), migré vers OpenRouter pour offrir plus de flexibilité et de choix de modèles.
 
+[![Demo Whisper](https://img.youtube.com/vi/YPAV6vU1tw4/0.jpg)](https://www.youtube.com/watch?v=YPAV6vU1tw4)
+
 ## Comment ça marche ?
 
 1. L'app vit dans ta barre de menu (en haut à droite de ton écran)
