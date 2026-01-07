@@ -50,9 +50,9 @@ struct SettingsView: View {
                                 
                                 Spacer()
                                 
-                                Link(destination: URL(string: "https://platform.openai.com/api-keys")!) {
+                                Link(destination: URL(string: "https://openrouter.ai/keys")!) {
                                     HStack(spacing: 4) {
-                                        Text("Obtenir une clé")
+                                        Text("Obtenir une clé OpenRouter")
                                         Image(systemName: "arrow.up.right")
                                             .font(.system(size: 9))
                                     }
@@ -67,6 +67,22 @@ struct SettingsView: View {
                         }
                     }
                     
+                    // MARK: - Model Selection Section
+                    SettingsSection(title: "MODÈLE DE TRANSCRIPTION", icon: "cpu") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(Constants.availableModels, id: \.id) { model in
+                                ModelSelectionRow(
+                                    modelID: model.id,
+                                    name: model.name,
+                                    description: model.description,
+                                    isSelected: appState.selectedModelID == model.id
+                                ) {
+                                    appState.setModel(model.id)
+                                }
+                            }
+                        }
+                    }
+
                     // MARK: - Usage Section
                     SettingsSection(title: "UTILISATION", icon: "command") {
                         VStack(alignment: .leading, spacing: 14) {
@@ -105,7 +121,7 @@ struct SettingsView: View {
                                     .foregroundColor(.secondary)
                             }
                             Spacer()
-                            Text("gpt-4o-mini-transcribe")
+                            Text(appState.selectedModelID.components(separatedBy: "/").last ?? "N/A")
                                 .font(.system(size: 10, weight: .bold))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
@@ -186,7 +202,7 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             Divider().opacity(0.5)
             HStack {
-                Text("Whisper utilise l'API OpenAI pour une précision optimale.")
+                Text("Whisper utilise OpenRouter pour accéder à plusieurs modèles d'IA.")
                     .font(.system(size: 10))
                     .foregroundColor(.secondary.opacity(0.7))
                 
@@ -207,12 +223,15 @@ struct SettingsView: View {
     
     private func validateKey() {
         guard !apiKeyInput.isEmpty else { return }
-        
+
+        // Nettoyer la clé API (enlever espaces, retours à la ligne, etc.)
+        let cleanedKey = apiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+
         isValidating = true
         showErrorHint = false
-        
+
         Task {
-            let success = await appState.updateAPIKey(apiKeyInput)
+            let success = await appState.updateAPIKey(cleanedKey)
             await MainActor.run {
                 isValidating = false
                 if success {
@@ -228,6 +247,42 @@ struct SettingsView: View {
 }
 
 // MARK: - Supporting Views
+
+struct ModelSelectionRow: View {
+    let modelID: String
+    let name: String
+    let description: String
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(name)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.primary)
+                    Text(description)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.accentColor)
+                        .font(.system(size: 16))
+                }
+            }
+            .padding(10)
+            .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
+            .cornerRadius(8)
+        }
+        .buttonStyle(.plain)
+        .onHover { inside in
+            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+    }
+}
 
 struct SettingsSection<Content: View>: View {
     let title: String
@@ -347,7 +402,8 @@ struct RefinedButtonStyle: ButtonStyle {
     }
 }
 
-#Preview {
-    SettingsView()
-        .environmentObject(AppState())
-}
+// #Preview removed for SPM compatibility
+// #Preview {
+//     SettingsView()
+//         .environmentObject(AppState())
+// }

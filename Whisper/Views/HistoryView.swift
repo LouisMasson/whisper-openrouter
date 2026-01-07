@@ -105,6 +105,7 @@ struct HistoryEntryView: View {
     }
 }
 
-#Preview {
-    HistoryView()
-}
+// #Preview removed for SPM compatibility
+// #Preview {
+//     HistoryView()
+// }

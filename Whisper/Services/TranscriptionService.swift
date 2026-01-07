@@ -4,8 +4,44 @@ final class TranscriptionService {
     static let shared = TranscriptionService()
     private init() {}
 
-    struct TranscriptionResponse: Codable {
-        let text: String
+    // MARK: - OpenRouter Request/Response Models
+
+    struct OpenRouterRequest: Codable {
+        let model: String
+        let messages: [Message]
+    }
+
+    struct Message: Codable {
+        let role: String
+        let content: [Content]
+    }
+
+    struct Content: Codable {
+        let type: String
+        let text: String?
+        let input_audio: InputAudio?
+
+        enum CodingKeys: String, CodingKey {
+            case type, text
+            case input_audio
+        }
+    }
+
+    struct InputAudio: Codable {
+        let data: String  // base64
+        let format: String  // audio format (m4a, mp3, etc.)
+    }
+
+    struct OpenRouterResponse: Codable {
+        let choices: [Choice]
+    }
+
+    struct Choice: Codable {
+        let message: MessageResponse
+    }
+
+    struct MessageResponse: Codable {
+        let content: String
     }
 
     struct ErrorResponse: Codable {
@@ -15,55 +51,68 @@ final class TranscriptionService {
     struct ErrorDetail: Codable {
         let message: String
         let type: String?
+        let code: String?
     }
 
-    func transcribe(audioURL: URL) async throws -> String {
+    // MARK: - Transcription
+
+    func transcribe(audioURL: URL, modelID: String? = nil) async throws -> String {
         guard let apiKey = KeychainHelper.shared.getAPIKey() else {
             throw TranscriptionError.noAPIKey
         }
 
-        guard let url = URL(string: Constants.openAITranscriptionURL) else {
+        guard let url = URL(string: Constants.openRouterChatURL) else {
             throw TranscriptionError.invalidURL
         }
 
-        let audioData = try Data(contentsOf: audioURL)
-        let boundary = UUID().uuidString
+        // Utiliser le modèle fourni ou le modèle par défaut
+        let selectedModel = modelID ?? Constants.defaultModelID
 
+        // Lire et encoder l'audio en base64
+        let audioData = try Data(contentsOf: audioURL)
+        let base64Audio = audioData.base64EncodedString()
+
+        // Créer la requête OpenRouter
+        let openRouterRequest = OpenRouterRequest(
+            model: selectedModel,
+            messages: [
+                Message(role: "user", content: [
+                    Content(
+                        type: "input_audio",
+                        text: nil,
+                        input_audio: InputAudio(data: base64Audio, format: "wav")
+                    ),
+                    Content(
+                        type: "text",
+                        text: "Transcris cet audio en texte. Donne uniquement la transcription exacte, rien d'autre.",
+                        input_audio: nil
+                    )
+                ])
+            ]
+        )
+
+        // Encoder en JSON
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        let requestBody = try encoder.encode(openRouterRequest)
+
+        // Debug: Afficher la requête (sans le base64 complet pour éviter de polluer les logs)
+        if let jsonString = String(data: requestBody, encoding: .utf8) {
+            let truncated = jsonString.prefix(500)
+            print("📤 Requête OpenRouter (tronquée): \(truncated)...")
+        }
+
+        // Créer la requête HTTP
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("https://whisper-macos.app", forHTTPHeaderField: "HTTP-Referer")
+        request.setValue("Whisper for macOS", forHTTPHeaderField: "X-Title")
+        request.httpBody = requestBody
 
-        var body = Data()
-
-        // Ajouter le fichier audio
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"audio.m4a\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: audio/m4a\r\n\r\n".data(using: .utf8)!)
-        body.append(audioData)
-        body.append("\r\n".data(using: .utf8)!)
-
-        // Ajouter le modèle
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"model\"\r\n\r\n".data(using: .utf8)!)
-        body.append("\(Constants.openAIModel)\r\n".data(using: .utf8)!)
-
-        // Ajouter la langue (français)
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"language\"\r\n\r\n".data(using: .utf8)!)
-        body.append("fr\r\n".data(using: .utf8)!)
-
-        // Ajouter le prompt avec des mots-clés techniques pour améliorer la reconnaissance
-        // NOTE: Le prompt doit être une LISTE DE MOTS, pas des instructions!
-        let prompt = "API, SDK, GitHub, TypeScript, JavaScript, React, Node.js, Python, Claude, GPT, LLM, MCP, STT, TTS, Whisper, OpenAI, Anthropic, Convex, Vercel, Next.js, SwiftUI, Xcode, iOS, macOS"
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"prompt\"\r\n\r\n".data(using: .utf8)!)
-        body.append("\(prompt)\r\n".data(using: .utf8)!)
-
-        // Terminer le body
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-
-        request.httpBody = body
+        // Augmenter le timeout pour les gros fichiers audio
+        request.timeoutInterval = 60
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -72,15 +121,41 @@ final class TranscriptionService {
         }
 
         if httpResponse.statusCode == 200 {
-            let transcriptionResponse = try JSONDecoder().decode(TranscriptionResponse.self, from: data)
-            return transcriptionResponse.text
+            // Debug: Afficher la réponse
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("📥 Réponse OpenRouter: \(responseString.prefix(500))...")
+            }
+
+            let openRouterResponse = try JSONDecoder().decode(OpenRouterResponse.self, from: data)
+
+            guard let transcription = openRouterResponse.choices.first?.message.content else {
+                throw TranscriptionError.invalidResponse
+            }
+
+            let cleanedTranscription = transcription.trimmingCharacters(in: .whitespacesAndNewlines)
+            print("✅ Transcription nettoyée: \(cleanedTranscription)")
+            return cleanedTranscription
         } else {
+            // Tenter de décoder l'erreur OpenRouter
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                // Si erreur 401, donner un message plus détaillé
+                if httpResponse.statusCode == 401 {
+                    throw TranscriptionError.authenticationFailed(errorResponse.error.message)
+                }
                 throw TranscriptionError.apiError(errorResponse.error.message)
             }
+
+            // Si on ne peut pas décoder l'erreur, afficher le contenu brut
+            if httpResponse.statusCode == 401 {
+                let errorText = String(data: data, encoding: .utf8) ?? "Erreur inconnue"
+                throw TranscriptionError.authenticationFailed("Clé API invalide ou expirée. Détails: \(errorText)")
+            }
+
             throw TranscriptionError.httpError(httpResponse.statusCode)
         }
     }
+
+    // MARK: - API Key Validation
 
     func validateAPIKey(_ apiKey: String) async -> Bool {
         // Sauvegarder temporairement pour tester
@@ -88,9 +163,8 @@ final class TranscriptionService {
 
         _ = KeychainHelper.shared.save(apiKey: apiKey)
 
-        // Créer un petit fichier audio de test (silence)
-        // Pour valider, on fait juste une requête simple
-        guard let url = URL(string: "https://api.openai.com/v1/models") else {
+        // Valider en faisant une requête simple vers l'endpoint OpenRouter
+        guard let url = URL(string: "https://openrouter.ai/api/v1/models") else {
             if let original = originalKey {
                 _ = KeychainHelper.shared.save(apiKey: original)
             }
@@ -118,12 +192,15 @@ final class TranscriptionService {
         return false
     }
 
+    // MARK: - Error Types
+
     enum TranscriptionError: LocalizedError {
         case noAPIKey
         case invalidURL
         case invalidResponse
         case apiError(String)
         case httpError(Int)
+        case authenticationFailed(String)
 
         var errorDescription: String? {
             switch self {
@@ -137,6 +214,8 @@ final class TranscriptionService {
                 return "Erreur API: \(message)"
             case .httpError(let code):
                 return "Erreur HTTP: \(code)"
+            case .authenticationFailed(let message):
+                return "Authentification échouée: \(message)"
             }
         }
     }

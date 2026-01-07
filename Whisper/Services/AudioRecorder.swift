@@ -32,7 +32,7 @@ final class AudioRecorder: NSObject, ObservableObject {
 
     private func getRecordingURL() -> URL {
         let tempDir = FileManager.default.temporaryDirectory
-        return tempDir.appendingPathComponent("whisper_recording_\(UUID().uuidString).m4a")
+        return tempDir.appendingPathComponent("whisper_recording_\(UUID().uuidString).wav")
     }
 
     func startRecording() throws {
@@ -43,11 +43,14 @@ final class AudioRecorder: NSObject, ObservableObject {
         let url = getRecordingURL()
         recordingURL = url
 
+        // WAV format settings (compatible avec GPT-4o Audio et Gemini)
         let settings: [String: Any] = [
-            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 16000, // 16kHz recommandé pour Whisper
+            AVFormatIDKey: Int(kAudioFormatLinearPCM),
+            AVSampleRateKey: 16000, // 16kHz recommandé pour transcription
             AVNumberOfChannelsKey: 1, // Mono
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsFloatKey: false
         ]
 
         audioRecorder = try AVAudioRecorder(url: url, settings: settings)

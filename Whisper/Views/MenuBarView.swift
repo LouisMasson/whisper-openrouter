@@ -145,7 +145,8 @@ struct MenuBarView: View {
     }
 }
 
-#Preview {
-    MenuBarView()
-        .environmentObject(AppState())
-}
+// #Preview removed for SPM compatibility
+// #Preview {
+//     MenuBarView()
+//         .environmentObject(AppState())
+// }

@@ -29,3 +29,14 @@ Carthage/Build/
 *.swp
 *.swo
 *~
+
+# Icon generation temporaries
+AppIcon.iconset/
+
+# Test and debug scripts
+run.sh
+run_with_logs.sh
+check_permissions.sh
+fix_automation.sh
+request_permissions.sh
+test_openrouter.sh

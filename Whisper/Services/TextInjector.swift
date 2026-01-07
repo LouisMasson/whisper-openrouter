@@ -15,6 +15,15 @@ final class TextInjector {
 
     /// Injecte le texte à la position actuelle du curseur via CGEvent
     func inject(text: String) {
+        print("📋 TextInjector: Début de l'injection de texte: \"\(text.prefix(50))...\"")
+
+        // Vérifier les permissions d'accessibilité
+        if !TextInjector.hasAccessibilityPermission() {
+            print("❌ TextInjector: Pas de permission d'accessibilité!")
+            TextInjector.requestAccessibilityPermission()
+            return
+        }
+
         // Sauvegarder le contenu actuel du presse-papiers
         let pasteboard = NSPasteboard.general
         let previousContents = pasteboard.string(forType: .string)
@@ -22,14 +31,19 @@ final class TextInjector {
         // Mettre le texte transcrit dans le presse-papiers
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
+        print("📋 TextInjector: Texte copié dans le presse-papiers")
 
         // S'assurer que l'app cible a le focus
         if let app = targetApp {
+            print("📋 TextInjector: Activation de l'app cible: \(app.localizedName ?? "?")")
             app.activate(options: [.activateIgnoringOtherApps])
+        } else {
+            print("⚠️ TextInjector: Aucune app cible capturée!")
         }
 
         // Délai pour s'assurer que l'app est vraiment active
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            print("📋 TextInjector: Tentative de collage...")
             self.pasteViaCGEvent()
 
             // Restaurer le presse-papiers après un délai
@@ -37,6 +51,7 @@ final class TextInjector {
                 if let previous = previousContents {
                     pasteboard.clearContents()
                     pasteboard.setString(previous, forType: .string)
+                    print("📋 TextInjector: Presse-papiers restauré")
                 }
                 self.targetApp = nil
             }
@@ -44,48 +59,45 @@ final class TextInjector {
     }
 
     private func pasteViaCGEvent() {
-        // CGEvent ne fonctionne pas bien sur macOS récent, utiliser AppleScript
-        pasteViaAppleScript()
-    }
+        print("📋 TextInjector: Utilisation de CGEvent pour Cmd+V")
 
-    private func pasteViaAppleScript() {
-        let script = """
-        tell application "System Events"
-            keystroke "v" using command down
-        end tell
-        """
+        // Créer événement Cmd+V via CGEvent (nécessite seulement Accessibility, pas Automation)
+        let vKeyCode: CGKeyCode = 9  // Touche V
 
-        var error: NSDictionary?
-        if let appleScript = NSAppleScript(source: script) {
-            appleScript.executeAndReturnError(&error)
+        // Événement: Appui sur Cmd
+        guard let cmdDown = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Command), keyDown: true) else {
+            print("❌ TextInjector: Impossible de créer événement Cmd down")
+            return
         }
 
-        if error != nil {
-            // Fallback: via le menu Edit > Paste de l'app frontale
-            pasteViaMenuClick()
+        // Événement: Appui sur V avec Cmd
+        guard let vDown = CGEvent(keyboardEventSource: nil, virtualKey: vKeyCode, keyDown: true) else {
+            print("❌ TextInjector: Impossible de créer événement V down")
+            return
         }
+        vDown.flags = .maskCommand
+
+        // Événement: Relâchement de V
+        guard let vUp = CGEvent(keyboardEventSource: nil, virtualKey: vKeyCode, keyDown: false) else {
+            print("❌ TextInjector: Impossible de créer événement V up")
+            return
+        }
+        vUp.flags = .maskCommand
+
+        // Événement: Relâchement de Cmd
+        guard let cmdUp = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(kVK_Command), keyDown: false) else {
+            print("❌ TextInjector: Impossible de créer événement Cmd up")
+            return
+        }
+
+        // Poster les événements
+        let loc = CGEventTapLocation.cghidEventTap
+        vDown.post(tap: loc)
+        vUp.post(tap: loc)
+
+        print("✅ TextInjector: Cmd+V envoyé via CGEvent")
     }
 
-    private func pasteViaMenuClick() {
-        guard let appName = targetApp?.localizedName else { return }
-
-        let script = """
-        tell application "\(appName)"
-            activate
-        end tell
-        delay 0.1
-        tell application "System Events"
-            tell process "\(appName)"
-                click menu item "Paste" of menu "Edit" of menu bar 1
-            end tell
-        end tell
-        """
-
-        var error: NSDictionary?
-        if let appleScript = NSAppleScript(source: script) {
-            appleScript.executeAndReturnError(&error)
-        }
-    }
 
     /// Vérifie si l'app a les permissions d'accessibilité
     static func hasAccessibilityPermission() -> Bool {
