@@ -4,6 +4,8 @@ Une app macOS ultra simple pour transcrire ta voix en texte, directement depuis 
 
 Maintiens la touche **Fn** enfoncée, parle, relâche, et le texte apparaît là où se trouve ton curseur. C'est tout.
 
+> **Note** : Ce projet est une reprise du projet original de [Paseru](https://github.com/Paseru/whisper), migré vers OpenRouter pour offrir plus de flexibilité et de choix de modèles.
+
 ## Comment ça marche ?
 
 1. L'app vit dans ta barre de menu (en haut à droite de ton écran)
@@ -12,21 +14,21 @@ Maintiens la touche **Fn** enfoncée, parle, relâche, et le texte apparaît là
 4. Tu relâches **Fn**
 5. Le texte transcrit est automatiquement collé là où tu étais en train d'écrire
 
-L'app utilise l'API OpenAI Whisper pour la transcription. C'est rapide, précis, et ça comprend super bien le français (y compris le vocabulaire tech : API, SDK, React, Node.js, etc.).
+L'app utilise l'API OpenRouter qui donne accès à plusieurs modèles de transcription audio (GPT-4o Audio, Gemini Flash, Gemini Pro). C'est rapide, précis, et ça comprend super bien le français (y compris le vocabulaire tech : API, SDK, React, Node.js, etc.).
 
 ## Installation
 
 ### Prérequis
 
 - macOS 14 (Sonoma) ou plus récent
-- Une clé API OpenAI ([créer un compte ici](https://platform.openai.com/api-keys))
-- Xcode (pour compiler l'app)
+- Une clé API OpenRouter ([créer un compte ici](https://openrouter.ai/keys))
+- Xcode (pour compiler l'app) ou Swift Package Manager
 
 ### Étapes
 
 1. **Clone le repo**
    ```bash
-   git clone https://github.com/Paseru/whisper.git
+   git clone https://github.com/louismasson/whisper.git
    cd whisper
    ```
 
@@ -40,7 +42,8 @@ L'app utilise l'API OpenAI Whisper pour la transcription. C'est rapide, précis,
 4. **Configure ta clé API**
    - Clique sur l'icône Whisper dans la barre de menu
    - Va dans les réglages
-   - Entre ta clé API OpenAI (commence par `sk-...`)
+   - Entre ta clé API OpenRouter (commence par `sk-or-...`)
+   - Choisis ton modèle de transcription préféré (GPT-4o Audio, Gemini Flash, ou Gemini Pro)
 
 5. **Accorde les permissions**
    - **Microphone** : pour enregistrer ta voix
@@ -84,38 +87,51 @@ L'app a besoin de ces permissions pour fonctionner :
 | **Microphone** | Pour enregistrer ta voix |
 | **Accessibilité** | Pour coller le texte automatiquement dans n'importe quelle app |
 
-## Clé API OpenAI
+## Clé API OpenRouter
 
-Tu as besoin d'une clé API OpenAI pour utiliser Whisper :
+Tu as besoin d'une clé API OpenRouter pour utiliser Whisper :
 
-1. Va sur [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+1. Va sur [openrouter.ai/keys](https://openrouter.ai/keys)
 2. Crée un compte ou connecte-toi
 3. Crée une nouvelle clé API
-4. Copie la clé (elle commence par `sk-...`)
+4. Copie la clé (elle commence par `sk-or-...`)
 5. Colle-la dans les réglages de Whisper
 
-**Note** : L'utilisation de l'API est payante, mais la transcription audio coûte très peu (~0.006$/minute). Consulte les [tarifs OpenAI](https://openai.com/pricing) pour plus de détails.
+**Note** : L'utilisation de l'API est payante, mais la transcription audio coûte très peu. OpenRouter donne accès à plusieurs modèles avec des tarifs différents. Consulte les [tarifs OpenRouter](https://openrouter.ai/models) pour plus de détails.
 
 Ta clé API est stockée de façon sécurisée dans le Keychain de macOS (le même endroit où sont stockés tes mots de passe).
 
 ## Comment ça fonctionne techniquement ?
 
 1. Quand tu appuies sur **Fn**, l'app commence à enregistrer ton micro
-2. L'audio est enregistré en format M4A (16kHz, mono)
-3. Quand tu relâches **Fn**, l'audio est envoyé à l'API OpenAI Whisper
-4. Le texte transcrit revient en quelques secondes
-5. L'app simule un Cmd+V pour coller le texte là où tu étais
+2. L'audio est enregistré en format WAV (PCM16, 16kHz, mono)
+3. Quand tu relâches **Fn**, l'audio est encodé en base64 et envoyé à l'API OpenRouter
+4. Le texte transcrit revient en quelques secondes (selon le modèle choisi)
+5. L'app utilise CGEvent pour injecter le texte là où se trouve ton curseur
 
 ## Confidentialité
 
-- **Audio** : Envoyé à OpenAI pour transcription, puis supprimé localement
+- **Audio** : Envoyé à OpenRouter (qui transmet au modèle choisi) pour transcription, puis supprimé localement
 - **Clé API** : Stockée dans le Keychain macOS (chiffré)
 - **Historique** : Stocké localement, supprimé après 24h
-- **Aucune télémétrie** : L'app n'envoie aucune donnée ailleurs qu'à OpenAI pour la transcription
+- **Aucune télémétrie** : L'app n'envoie aucune donnée ailleurs qu'à OpenRouter pour la transcription
 
 ## Contribuer
 
 Les PRs sont les bienvenues ! Si tu trouves un bug ou tu as une idée de feature, ouvre une issue.
+
+## Crédits
+
+Ce projet est une reprise et une amélioration du projet original créé par [Paseru](https://github.com/Paseru/whisper). Merci à lui pour avoir créé cette base solide !
+
+### Principales modifications dans cette version
+
+- Migration de l'API OpenAI Whisper vers OpenRouter
+- Support de plusieurs modèles de transcription (GPT-4o Audio, Gemini Flash, Gemini Pro)
+- Changement du format audio de M4A vers WAV (PCM16) pour une meilleure compatibilité
+- Remplacement d'AppleScript par CGEvent pour l'injection de texte (plus fiable et moins de permissions requises)
+- Ajout du support Swift Package Manager pour la compilation sans Xcode
+- Ajout d'une icône personnalisée avec symbole microphone
 
 ## Licence
 
