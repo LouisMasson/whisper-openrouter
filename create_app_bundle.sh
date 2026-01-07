@@ -62,8 +62,6 @@ cat > "$CONTENTS_PATH/Info.plist" << 'EOF'
     <true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>Whisper a besoin d'accéder au microphone pour enregistrer votre voix et la transcrire en texte.</string>
-    <key>NSAppleEventsUsageDescription</key>
-    <string>Whisper a besoin de contrôler d'autres applications pour insérer automatiquement le texte transcrit.</string>
 </dict>
 </plist>
 EOF
